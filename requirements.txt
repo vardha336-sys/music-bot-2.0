@@ -1,9 +1,8 @@
 pyrogram==2.0.106
-pytgcalls==0.12.0
+pytgcalls==0.10.0
 tgcrypto
 yt-dlp
 ffmpeg-python
 pymongo
 dnspython
 requests
-
