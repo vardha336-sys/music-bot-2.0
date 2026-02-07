@@ -5,11 +5,9 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 from pytgcalls import PyTgCalls
-from pytgcalls.types.stream import StreamAudioEnded
-from pytgcalls.types.input_stream import AudioPiped
-from pytgcalls.types.input_stream.quality import HighQualityAudio
-from pytgcalls.types import Update
+from pytgcalls.types import AudioPiped, Update
 from pytgcalls.types.groups import GroupCallParticipantsUpdate
+from pytgcalls.types.input_stream.quality import HighQualityAudio
 
 from yt_dlp import YoutubeDL
 from pymongo import MongoClient
@@ -31,14 +29,6 @@ settings = db.settings
 def get_setting(chat_id, key, default=True):
     data = settings.find_one({"chat_id": chat_id})
     return data.get(key, default) if data else default
-
-
-def set_setting(chat_id, key, value):
-    settings.update_one(
-        {"chat_id": chat_id},
-        {"$set": {key: value}},
-        upsert=True
-    )
 
 
 # ────────── Bot ──────────
@@ -127,10 +117,7 @@ async def play(_, message):
     if len(queues[chat_id]) == 1:
         await pytgcalls.join_group_call(
             chat_id,
-            AudioPiped(
-                url,
-                HighQualityAudio()
-            ),
+            AudioPiped(url, HighQualityAudio())
         )
         await app.send_photo(
             chat_id,
@@ -165,10 +152,7 @@ async def cb(_, q: CallbackQuery):
         if queues.get(chat_id):
             await pytgcalls.change_stream(
                 chat_id,
-                AudioPiped(
-                    queues[chat_id][0][0],
-                    HighQualityAudio()
-                )
+                AudioPiped(queues[chat_id][0][0], HighQualityAudio())
             )
         else:
             await pytgcalls.leave_group_call(chat_id)
