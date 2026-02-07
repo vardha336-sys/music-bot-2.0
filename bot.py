@@ -7,8 +7,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 from pytgcalls import PyTgCalls
 from pytgcalls.types.input_stream import AudioPiped
 from pytgcalls.types.input_stream.quality import HighQualityAudio
-from pytgcalls.types import Update
-from pytgcalls.types.groups import GroupCallParticipantsUpdate
 
 from yt_dlp import YoutubeDL
 from pymongo import MongoClient
@@ -169,15 +167,6 @@ async def cb(_, q: CallbackQuery):
             return await q.answer("Queue empty", show_alert=True)
         text = "\n".join(f"{i+1}. {s[1]}" for i, s in enumerate(queues[chat_id]))
         await q.message.reply(f"📜 **Queue**\n\n{text}")
-
-
-# ────────── Auto Leave ──────────
-@pytgcalls.on_update()
-async def auto_leave(update: Update):
-    if isinstance(update, GroupCallParticipantsUpdate):
-        if len(update.participants) <= 1:
-            queues.pop(update.chat_id, None)
-            await pytgcalls.leave_group_call(update.chat_id)
 
 
 # ────────── Start ──────────
