@@ -5,6 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 from pytgcalls import PyTgCalls
+from pytgcalls.types.stream import StreamAudioEnded
 from pytgcalls.types.input_stream import AudioPiped
 from pytgcalls.types.input_stream.quality import HighQualityAudio
 from pytgcalls.types import Update
