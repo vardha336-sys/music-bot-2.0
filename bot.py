@@ -5,7 +5,7 @@ import requests
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls.types import AudioPiped
 from pytgcalls.types import Update
 from pytgcalls.types.groups import GroupCallParticipantsUpdate
 from yt_dlp import YoutubeDL
