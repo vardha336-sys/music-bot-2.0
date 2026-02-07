@@ -1,15 +1,18 @@
 import asyncio
 import os
-import re
 import requests
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls.types.input_stream.quality import HighQualityAudio
 from pytgcalls.types import Update
 from pytgcalls.types.groups import GroupCallParticipantsUpdate
+
 from yt_dlp import YoutubeDL
 from pymongo import MongoClient
+
 
 # ────────── ENV CONFIG ──────────
 API_ID = int(os.getenv("API_ID"))
@@ -17,14 +20,17 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URL = os.getenv("MONGO_URL")
 
+
 # ────────── MongoDB ──────────
 mongo = MongoClient("mongodb+srv://littichokhabhnkichu_db_user:agPdfLn5VaaoOzW5@cluster0.cqapsq3.mongodb.net/?appName=cluster0")
 db = mongo.musicbot
 settings = db.settings
 
+
 def get_setting(chat_id, key, default=True):
     data = settings.find_one({"chat_id": chat_id})
     return data.get(key, default) if data else default
+
 
 def set_setting(chat_id, key, value):
     settings.update_one(
@@ -32,6 +38,7 @@ def set_setting(chat_id, key, value):
         {"$set": {key: value}},
         upsert=True
     )
+
 
 # ────────── Bot ──────────
 app = Client(
@@ -44,6 +51,7 @@ app = Client(
 pytgcalls = PyTgCalls(app)
 queues = {}
 
+
 # ────────── YouTube ──────────
 ydl_opts = {
     "format": "bestaudio",
@@ -51,10 +59,12 @@ ydl_opts = {
     "noplaylist": True
 }
 
+
 def yt_search(query):
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"ytsearch:{query}", download=False)["entries"][0]
         return info["url"], info["title"], info["duration"], info["thumbnail"]
+
 
 # ────────── Spotify → YouTube ──────────
 def spotify_to_query(url):
@@ -64,10 +74,12 @@ def spotify_to_query(url):
     ).json()
     return f"{data['title']} {data['author_name']}"
 
+
 # ────────── Utils ──────────
 def format_time(sec):
     m, s = divmod(sec, 60)
     return f"{m}:{s:02d}"
+
 
 def buttons():
     return InlineKeyboardMarkup(
@@ -86,11 +98,13 @@ def buttons():
         ]
     )
 
+
 async def is_admin(client, chat_id, user_id):
     async for m in client.get_chat_members(chat_id, filter="administrators"):
         if m.user.id == user_id:
             return True
     return False
+
 
 # ────────── Commands ──────────
 @app.on_message(filters.command("play") & filters.group)
@@ -112,7 +126,10 @@ async def play(_, message):
     if len(queues[chat_id]) == 1:
         await pytgcalls.join_group_call(
             chat_id,
-            AudioPiped(url),
+            AudioPiped(
+                url,
+                HighQualityAudio()
+            ),
         )
         await app.send_photo(
             chat_id,
@@ -122,6 +139,7 @@ async def play(_, message):
         )
     else:
         await msg.edit(f"➕ Queue me add ho gaya:\n**{title}**")
+
 
 # ────────── Callbacks ──────────
 @app.on_callback_query()
@@ -143,8 +161,14 @@ async def cb(_, q: CallbackQuery):
 
     elif q.data == "skip":
         queues[chat_id].pop(0)
-        if queues[chat_id]:
-            await pytgcalls.change_stream(chat_id, AudioPiped(queues[chat_id][0][0]))
+        if queues.get(chat_id):
+            await pytgcalls.change_stream(
+                chat_id,
+                AudioPiped(
+                    queues[chat_id][0][0],
+                    HighQualityAudio()
+                )
+            )
         else:
             await pytgcalls.leave_group_call(chat_id)
         await q.answer("⏭ Skipped")
@@ -160,6 +184,7 @@ async def cb(_, q: CallbackQuery):
         text = "\n".join(f"{i+1}. {s[1]}" for i, s in enumerate(queues[chat_id]))
         await q.message.reply(f"📜 **Queue**\n\n{text}")
 
+
 # ────────── Auto Leave ──────────
 @pytgcalls.on_update()
 async def auto_leave(update: Update):
@@ -168,10 +193,12 @@ async def auto_leave(update: Update):
             queues.pop(update.chat_id, None)
             await pytgcalls.leave_group_call(update.chat_id)
 
+
 # ────────── Start ──────────
 async def main():
     await app.start()
     await pytgcalls.start()
     await asyncio.Event().wait()
+
 
 asyncio.run(main())
