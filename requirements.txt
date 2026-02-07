@@ -1,5 +1,7 @@
 pyrogram==2.0.106
 tgcrypto
-pytgcalls==3.0.0.dev21
-motor==3.3.2
+pytgcalls==3.0.0.dev24
+yt-dlp
+pymongo
 dnspython
+requests
