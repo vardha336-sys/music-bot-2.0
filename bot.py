@@ -1,4 +1,7 @@
 import asyncio
+import os
+import re
+import requests
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pytgcalls import PyTgCalls
@@ -7,12 +10,15 @@ from pytgcalls.types import Update
 from pytgcalls.types.groups import GroupCallParticipantsUpdate
 from yt_dlp import YoutubeDL
 from pymongo import MongoClient
-import re
 
-from config import API_ID, API_HASH, BOT_TOKEN, MONGO_URL
+# ────────── ENV CONFIG ──────────
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MONGO_URL = os.getenv("MONGO_URL")
 
 # ────────── MongoDB ──────────
-mongo = MongoClient(mongodb+srv://littichhokhabhnkichu_db_user:agPdfLn5VaaoOzW5@cluster0.cqapsq3.mongodb.net/?appName=Cluster0)
+mongo = MongoClient("mongodb+srv://littichokhabhnkichu_db_user:agPdfLn5VaaoOzW5@cluster0.cqapsq3.mongodb.net/?appName=cluster0")
 db = mongo.musicbot
 settings = db.settings
 
@@ -34,14 +40,15 @@ app = Client(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
-pytgcalls = PyTgCalls(app)
 
+pytgcalls = PyTgCalls(app)
 queues = {}
 
 # ────────── YouTube ──────────
 ydl_opts = {
     "format": "bestaudio",
-    "quiet": True
+    "quiet": True,
+    "noplaylist": True
 }
 
 def yt_search(query):
@@ -51,8 +58,6 @@ def yt_search(query):
 
 # ────────── Spotify → YouTube ──────────
 def spotify_to_query(url):
-    # Spotify title fetch via oEmbed (simple + safe)
-    import requests
     data = requests.get(
         "https://open.spotify.com/oembed",
         params={"url": url}
@@ -65,50 +70,58 @@ def format_time(sec):
     return f"{m}:{s:02d}"
 
 def buttons():
-    return InlineKeyboardMarkup([
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("⏸ Pause", callback_data="pause"),
-            InlineKeyboardButton("▶️ Resume", callback_data="resume")
-        ],
-        [
-            InlineKeyboardButton("⏭ Skip", callback_data="skip"),
-            InlineKeyboardButton("⏹ Stop", callback_data="stop")
-        ],
-        [
-            InlineKeyboardButton("📜 Queue", callback_data="queue")
+            [
+                InlineKeyboardButton("⏸ Pause", callback_data="pause"),
+                InlineKeyboardButton("▶ Resume", callback_data="resume")
+            ],
+            [
+                InlineKeyboardButton("⏭ Skip", callback_data="skip"),
+                InlineKeyboardButton("⏹ Stop", callback_data="stop")
+            ],
+            [
+                InlineKeyboardButton("📜 Queue", callback_data="queue")
+            ]
         ]
-    ])
+    )
 
 async def is_admin(client, chat_id, user_id):
-    admins = await client.get_chat_members(chat_id, filter="administrators")
-    return user_id in [a.user.id for a in admins]
+    async for m in client.get_chat_members(chat_id, filter="administrators"):
+        if m.user.id == user_id:
+            return True
+    return False
 
 # ────────── Commands ──────────
 @app.on_message(filters.command("play") & filters.group)
 async def play(_, message):
     chat_id = message.chat.id
     query = " ".join(message.command[1:])
+
     if not query:
-        return await message.reply("❌ Song ya Spotify link de bhai")
+        return await message.reply("❌ Song name ya Spotify link de")
 
     if "spotify.com" in query:
         query = spotify_to_query(query)
 
-    msg = await message.reply("🔎 Search ho raha hai...")
+    msg = await message.reply("🔎 Search kar raha hoon...")
     url, title, duration, thumb = yt_search(query)
 
     queues.setdefault(chat_id, []).append((url, title, duration, thumb))
 
     if len(queues[chat_id]) == 1:
-        await pytgcalls.join_group_call(chat_id, AudioPiped(url))
+        await pytgcalls.join_group_call(
+            chat_id,
+            AudioPiped(url),
+        )
         await app.send_photo(
             chat_id,
             photo=thumb,
-            caption=f"🎵 **Now Playing**\n📌 {title}\n⏱ {format_time(duration)}",
+            caption=f"🎵 **Now Playing**\n\n**{title}**\n⏱ {format_time(duration)}",
             reply_markup=buttons()
         )
     else:
-        await msg.edit(f"➕ Queue me add: **{title}**")
+        await msg.edit(f"➕ Queue me add ho gaya:\n**{title}**")
 
 # ────────── Callbacks ──────────
 @app.on_callback_query()
@@ -118,7 +131,7 @@ async def cb(_, q: CallbackQuery):
 
     if get_setting(chat_id, "admin_only", True):
         if not await is_admin(app, chat_id, user_id):
-            return await q.answer("❌ Sirf admin", show_alert=True)
+            return await q.answer("❌ Sirf admins use kar sakte hain", show_alert=True)
 
     if q.data == "pause":
         await pytgcalls.pause_stream(chat_id)
@@ -126,14 +139,12 @@ async def cb(_, q: CallbackQuery):
 
     elif q.data == "resume":
         await pytgcalls.resume_stream(chat_id)
-        await q.answer("▶️ Resumed")
+        await q.answer("▶ Resumed")
 
     elif q.data == "skip":
         queues[chat_id].pop(0)
         if queues[chat_id]:
-            await pytgcalls.change_stream(
-                chat_id, AudioPiped(queues[chat_id][0][0])
-            )
+            await pytgcalls.change_stream(chat_id, AudioPiped(queues[chat_id][0][0]))
         else:
             await pytgcalls.leave_group_call(chat_id)
         await q.answer("⏭ Skipped")
@@ -146,10 +157,8 @@ async def cb(_, q: CallbackQuery):
     elif q.data == "queue":
         if not queues.get(chat_id):
             return await q.answer("Queue empty", show_alert=True)
-        text = "\n".join(
-            f"{i+1}. {s[1]}" for i, s in enumerate(queues[chat_id])
-        )
-        await q.message.reply(f"📜 **Queue**\n{text}")
+        text = "\n".join(f"{i+1}. {s[1]}" for i, s in enumerate(queues[chat_id]))
+        await q.message.reply(f"📜 **Queue**\n\n{text}")
 
 # ────────── Auto Leave ──────────
 @pytgcalls.on_update()
@@ -160,6 +169,9 @@ async def auto_leave(update: Update):
             await pytgcalls.leave_group_call(update.chat_id)
 
 # ────────── Start ──────────
-app.start()
-pytgcalls.start()
-asyncio.get_event_loop().run_forever()
+async def main():
+    await app.start()
+    await pytgcalls.start()
+    await asyncio.Event().wait()
+
+asyncio.run(main())
