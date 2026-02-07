@@ -1,5 +1,6 @@
-pyrogram
+pyrogram==2.0.106
 tgcrypto
-pytgcalls
-yt-dlp
-asyncio
+pytgcalls==3.0.0.dev21
+ffmpeg-python
+motor
+dnspython
