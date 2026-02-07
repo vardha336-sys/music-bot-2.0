@@ -1,6 +1,5 @@
 pyrogram==2.0.106
 tgcrypto
 pytgcalls==3.0.0.dev21
-ffmpeg-python
-motor
+motor==3.3.2
 dnspython
